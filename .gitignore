@@ -1,0 +1,21 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Node / front-end (reservado para a próxima rodada)
+node_modules/
+dist/
+
+## Segredos e ambiente local
+.env
+
+## IDE
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+## Logs
+*.log
