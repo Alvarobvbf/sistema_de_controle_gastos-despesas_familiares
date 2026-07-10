@@ -39,7 +39,7 @@ export function TransacoesPage() {
     () => pessoas?.find((pessoa) => pessoa.id === pessoaId),
     [pessoas, pessoaId],
   )
-  const pessoaEhMenorDeIdade = (pessoaSelecionada?.idade ?? 0) < IDADE_MINIMA_RECEITA
+  const pessoaEhMenorDeIdade = pessoaSelecionada !== undefined && pessoaSelecionada.idade < IDADE_MINIMA_RECEITA
 
   function aoSelecionarPessoa(id: string) {
     setPessoaId(id)
