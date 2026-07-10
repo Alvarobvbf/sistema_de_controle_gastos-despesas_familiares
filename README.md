@@ -3,7 +3,7 @@
 Sistema de controle de gastos residenciais: cadastro de pessoas, registro de suas
 transações (receitas e despesas) e consulta de totais consolidados por pessoa e geral.
 
-**Deploy (Railway):** _\<colar aqui o link depois do deploy manual>_
+**Deploy (Railway):** https://sistemadecontrolegastos-despesasfamiliares-production.up.railway.app
 
 ## Funcionalidades
 
