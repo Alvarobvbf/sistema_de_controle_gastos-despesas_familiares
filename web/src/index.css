@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Tailwind v4 já usa "prefers-color-scheme" como estratégia padrão para o
+   variant dark: — não precisa de config extra, só aplicar dark:* nas classes. */
+body {
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
+}

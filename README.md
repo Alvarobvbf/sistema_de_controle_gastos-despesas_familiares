@@ -3,15 +3,15 @@
 Sistema de controle de gastos residenciais: cadastro de pessoas e de suas transações
 (receitas e despesas), com consulta de totais consolidados.
 
-> Status atual: apenas o **back-end** está implementado nesta rodada. O front-end
-> (Vite + React + TypeScript) e o Docker Compose ficam reservados para a próxima rodada,
-> na pasta `web/` (ainda não criada).
+> Status atual: back-end e front-end implementados e rodando localmente (front contra o
+> back via proxy do Vite). O Docker Compose fica reservado para a próxima rodada.
 
 ## Stack
 
 - .NET 10 (ASP.NET Core Web API)
 - Entity Framework Core + Npgsql (PostgreSQL)
 - xUnit + EF Core InMemory (testes)
+- Vite + React + TypeScript + Tailwind CSS v4 + react-router (`web/`)
 
 ## Arquitetura
 
@@ -117,3 +117,41 @@ Com a API do passo 3 rodando, em outro terminal:
 Exercita o caminho feliz e as regras de negócio (menor não pode ter receita, pessoa
 inexistente é rejeitada, cascade na deleção etc.) via HTTP de verdade — complementa os
 testes automatizados, que rodam isolados via InMemory. Requer `curl` e `jq`.
+
+## Front-end (`web/`)
+
+SPA em Vite + React + TypeScript + Tailwind v4, consumindo a API via URLs relativas
+(`/api/...`, same-origin — sem CORS, sem base URL configurável).
+
+```
+web/src/
+  api/        client HTTP central (envelope de erro) + uma função por endpoint
+  types/      tipos TS espelhando os DTOs reais do back
+  hooks/      useApiData (loading/erro) e useDebounce (busca por nome)
+  components/ Layout (nav), estados de loading/erro/vazio, badge de tipo
+  pages/      as 3 telas: Pessoas, Transações, Totais
+  router.tsx  as 3 rotas + redirect da raiz
+```
+
+### Como rodar
+
+Com o back-end já rodando localmente (seção anterior):
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Abre em `http://localhost:5173`. O proxy configurado em `vite.config.ts` encaminha
+`/api/...` para `http://localhost:8080` (mesma porta usada pelo back-end local) — por
+isso não há CORS em dev, e em produção (imagem única, próxima rodada) o próprio back
+serve os estáticos, mantendo o same-origin real.
+
+### Notas de UX
+
+- A regra "menor de 18 anos só pode ter despesa" é refletida no formulário de criação de
+  transação (a opção "Receita" fica desabilitada) — isso é só prevenção de UX; quem decide
+  de fato é o back-end, que responde 422 (`REGRA_MENOR_RECEITA`) se essa checagem for burlada.
+- Toda resposta de erro do back (400/422) é lida do envelope `{ error: { code, message } }`
+  e a `message` é exibida diretamente ao usuário.

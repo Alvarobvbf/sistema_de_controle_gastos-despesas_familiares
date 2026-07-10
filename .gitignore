@@ -4,7 +4,7 @@ obj/
 *.user
 *.suo
 
-## Node / front-end (reservado para a próxima rodada)
+## Node / front-end
 node_modules/
 dist/
 
