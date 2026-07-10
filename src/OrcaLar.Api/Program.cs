@@ -66,6 +66,22 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseAuthorization();
 
+// Serve os estáticos da SPA (JS/CSS/imagens buildados pelo Vite, copiados para wwwroot
+// no Dockerfile). Precisa vir antes de MapControllers/MapFallbackToFile: se a requisição
+// bater num arquivo físico existente em wwwroot, esse middleware já responde e encerra o
+// pipeline ali — sem isso, os assets do bundle (ex.: /assets/index-xxxx.js) cairiam no
+// fallback abaixo e devolveriam o index.html no lugar do arquivo real.
+app.UseStaticFiles();
+
+// Rotas /api/* continuam com prioridade: endpoints mapeados por MapControllers (que casam
+// por rota exata) sempre vencem o fallback abaixo, independente da ordem de registro — o
+// roteamento do ASP.NET Core trata MapFallbackToFile como a opção de menor prioridade.
 app.MapControllers();
+
+// Qualquer rota que não seja /api/* nem um arquivo estático (ex.: /transacoes, /totais,
+// ou um F5 direto nessas URLs) cai aqui e recebe o mesmo index.html — é o react-router,
+// no cliente, quem decide qual tela mostrar. Sem isso, recarregar uma rota da SPA que não
+// seja "/" devolveria 404, porque o servidor não conhece essas rotas.
+app.MapFallbackToFile("index.html");
 
 app.Run();

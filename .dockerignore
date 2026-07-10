@@ -1,0 +1,17 @@
+# .NET
+**/bin/
+**/obj/
+tests/
+
+# Node / front-end
+**/node_modules/
+web/dist/
+
+# Controle de versão e segredos — nunca entram no contexto de build
+.git/
+.env
+
+# IDE
+.vs/
+.vscode/
+.idea/

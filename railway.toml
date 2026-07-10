@@ -1,0 +1,6 @@
+# Configuração mínima — o Railway autodetecta o Dockerfile na raiz mesmo sem este
+# arquivo. Ele existe só para deixar explícito qual builder usar, sem depender de
+# autodetecção silenciosa.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
