@@ -11,7 +11,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orcalar}
       POSTGRES_DB: ${POSTGRES_DB:-orcalar}
     volumes:
-      - orcalar_db_data:/var/lib/postgresql/data
+      # A partir da versão 18, a imagem oficial do Postgres espera o volume montado em
+      # /var/lib/postgresql (não mais .../data como nas versões anteriores) — ela mesma
+      # organiza os dados numa subpasta versionada por dentro. Montar em .../data faz a
+      # imagem recusar a subir, por não reconhecer o layout.
+      - orcalar_db_data:/var/lib/postgresql
     ports:
       # Publicada no host para permitir o fluxo "só o banco no Docker, back-end via
       # dotnet run direto" (útil em dev) — a app do serviço "app" acima não depende
