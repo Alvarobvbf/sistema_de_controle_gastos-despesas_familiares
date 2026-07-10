@@ -35,4 +35,30 @@ public class PessoaServiceTests
 
         Assert.False(deletado);
     }
+
+    [Fact]
+    public async Task Deletar_DeveRemoverFixasEmCascata()
+    {
+        await using var dbContext = TestDbContextFactory.Criar();
+
+        var pessoa = new Pessoa { Id = Guid.NewGuid(), Nome = "Ana", Idade = 30 };
+        dbContext.Pessoas.Add(pessoa);
+        dbContext.Fixas.Add(new Fixa
+        {
+            Id = Guid.NewGuid(),
+            Descricao = "Aluguel",
+            Valor = 1200m,
+            Tipo = TipoTransacao.Despesa,
+            PessoaId = pessoa.Id,
+            DiaDoMes = 5,
+            DataInicio = new DateOnly(2026, 1, 1)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = new PessoaService(dbContext);
+        var deletado = await service.DeletarAsync(pessoa.Id);
+
+        Assert.True(deletado);
+        Assert.Empty(dbContext.Fixas);
+    }
 }

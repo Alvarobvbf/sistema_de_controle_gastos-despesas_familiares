@@ -50,6 +50,8 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddScoped<PessoaService>();
 builder.Services.AddScoped<TransacaoService>();
 builder.Services.AddScoped<TotaisService>();
+builder.Services.AddScoped<FixaService>();
+builder.Services.AddScoped<DashboardService>();
 
 builder.Services.AddOpenApi();
 

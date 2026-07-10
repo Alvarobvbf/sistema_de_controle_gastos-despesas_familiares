@@ -16,7 +16,9 @@ public record CriarTransacaoRequest(
     decimal Valor,
     [Required(ErrorMessage = "O tipo é obrigatório.")]
     TipoTransacao? Tipo,
-    Guid PessoaId
+    Guid PessoaId,
+    /// <summary>Opcional: se omitida, o TransacaoService preenche com a data atual do servidor.</summary>
+    DateOnly? Data
 );
 
 /// <summary>Representação de Transacao devolvida pela API, já com o nome da pessoa embutido.</summary>
@@ -26,5 +28,6 @@ public record TransacaoDto(
     decimal Valor,
     TipoTransacao Tipo,
     Guid PessoaId,
-    string PessoaNome
+    string PessoaNome,
+    DateOnly Data
 );

@@ -14,7 +14,7 @@ public class TransacaoServiceTests
         var service = new TransacaoService(dbContext);
 
         var excecao = await Assert.ThrowsAsync<RegraDeNegocioException>(() =>
-            service.CriarAsync("Salário", 100m, TipoTransacao.Receita, Guid.NewGuid()));
+            service.CriarAsync("Salário", 100m, TipoTransacao.Receita, Guid.NewGuid(), data: null));
 
         Assert.Equal(CodigosErro.PessoaNaoEncontrada, excecao.Code);
     }
@@ -27,7 +27,7 @@ public class TransacaoServiceTests
         var service = new TransacaoService(dbContext);
 
         var excecao = await Assert.ThrowsAsync<RegraDeNegocioException>(() =>
-            service.CriarAsync("Mesada", 50m, TipoTransacao.Receita, pessoa.Id));
+            service.CriarAsync("Mesada", 50m, TipoTransacao.Receita, pessoa.Id, data: null));
 
         Assert.Equal(CodigosErro.RegraMenorReceita, excecao.Code);
     }
@@ -39,7 +39,7 @@ public class TransacaoServiceTests
         var pessoa = await CriarPessoaAsync(dbContext, idade: 17);
         var service = new TransacaoService(dbContext);
 
-        var transacao = await service.CriarAsync("Lanche", 20m, TipoTransacao.Despesa, pessoa.Id);
+        var transacao = await service.CriarAsync("Lanche", 20m, TipoTransacao.Despesa, pessoa.Id, data: null);
 
         Assert.Equal(TipoTransacao.Despesa, transacao.Tipo);
         Assert.Equal(pessoa.Id, transacao.PessoaId);
@@ -55,9 +55,50 @@ public class TransacaoServiceTests
         var pessoa = await CriarPessoaAsync(dbContext, idade: 18);
         var service = new TransacaoService(dbContext);
 
-        var transacao = await service.CriarAsync("Transação", 30m, tipo, pessoa.Id);
+        var transacao = await service.CriarAsync("Transação", 30m, tipo, pessoa.Id, data: null);
 
         Assert.Equal(tipo, transacao.Tipo);
+    }
+
+    [Fact]
+    public async Task Criar_SemDataInformada_UsaDataAtualDoServidor()
+    {
+        await using var dbContext = TestDbContextFactory.Criar();
+        var pessoa = await CriarPessoaAsync(dbContext, idade: 30);
+        var service = new TransacaoService(dbContext);
+
+        var transacao = await service.CriarAsync("Mercado", 100m, TipoTransacao.Despesa, pessoa.Id, data: null);
+
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), transacao.Data);
+    }
+
+    [Fact]
+    public async Task Criar_ComDataInformada_UsaADataInformada()
+    {
+        await using var dbContext = TestDbContextFactory.Criar();
+        var pessoa = await CriarPessoaAsync(dbContext, idade: 30);
+        var service = new TransacaoService(dbContext);
+        var dataEscolhida = new DateOnly(2026, 1, 15);
+
+        var transacao = await service.CriarAsync("Presente de aniversário", 200m, TipoTransacao.Despesa, pessoa.Id, dataEscolhida);
+
+        Assert.Equal(dataEscolhida, transacao.Data);
+    }
+
+    [Fact]
+    public async Task Listar_DeveOrdenarPorDataDecrescente()
+    {
+        await using var dbContext = TestDbContextFactory.Criar();
+        var pessoa = await CriarPessoaAsync(dbContext, idade: 30);
+        var service = new TransacaoService(dbContext);
+
+        await service.CriarAsync("Mais antiga", 10m, TipoTransacao.Despesa, pessoa.Id, new DateOnly(2026, 1, 1));
+        await service.CriarAsync("Mais recente", 20m, TipoTransacao.Despesa, pessoa.Id, new DateOnly(2026, 3, 1));
+        await service.CriarAsync("Intermediária", 30m, TipoTransacao.Despesa, pessoa.Id, new DateOnly(2026, 2, 1));
+
+        var transacoes = await service.ListarAsync(pessoaId: null, tipo: null);
+
+        Assert.Equal(["Mais recente", "Intermediária", "Mais antiga"], transacoes.Select(t => t.Descricao));
     }
 
     private static async Task<Pessoa> CriarPessoaAsync(AppDbContext dbContext, int idade)

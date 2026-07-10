@@ -18,6 +18,12 @@ public class Transacao
 
     public TipoTransacao Tipo { get; set; }
 
+    /// <summary>
+    /// Data em que a transação ocorreu. Opcional na criação (o Service preenche com a data
+    /// atual do servidor quando omitida) — ver TransacaoService.CriarAsync.
+    /// </summary>
+    public DateOnly Data { get; set; }
+
     public Guid PessoaId { get; set; }
 
     public Pessoa Pessoa { get; set; } = null!;

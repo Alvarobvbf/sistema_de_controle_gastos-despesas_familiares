@@ -27,7 +27,8 @@ public class TransacoesController : ControllerBase
             request.Descricao,
             request.Valor,
             request.Tipo!.Value,
-            request.PessoaId);
+            request.PessoaId,
+            request.Data);
 
         return Created($"/api/transacoes/{transacao.Id}", transacao);
     }

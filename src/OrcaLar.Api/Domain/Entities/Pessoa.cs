@@ -17,4 +17,7 @@ public class Pessoa
     public int Idade { get; set; }
 
     public ICollection<Transacao> Transacoes { get; set; } = new List<Transacao>();
+
+    /// <summary>Regras de lançamento recorrente da pessoa — também apagadas em cascata.</summary>
+    public ICollection<Fixa> Fixas { get; set; } = new List<Fixa>();
 }

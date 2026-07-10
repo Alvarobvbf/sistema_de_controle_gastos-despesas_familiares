@@ -105,6 +105,36 @@ else
 fi
 
 echo
+echo "-- Fixas: cadastro e regra de negócio --"
+
+status=$(chamar POST /api/fixas "{\"descricao\":\"Aluguel\",\"valor\":1200,\"tipo\":\"Despesa\",\"pessoaId\":\"$ANA_ID\",\"diaDoMes\":5}")
+verificar "criar fixa (despesa) para adulto" 201 "$status"
+
+status=$(chamar POST /api/fixas "{\"descricao\":\"Mesada fixa\",\"valor\":100,\"tipo\":\"Receita\",\"pessoaId\":\"$BIA_ID\",\"diaDoMes\":10}")
+verificar "receita fixa para menor de idade: rejeitado (422)" 422 "$status"
+codigo=$(corpo | jq -r '.error.code')
+[[ "$codigo" == "REGRA_MENOR_RECEITA" ]] \
+  && echo "  OK     código de erro = REGRA_MENOR_RECEITA (fixa)" \
+  || { echo "  FALHOU código de erro inesperado: $codigo"; FALHAS=$((FALHAS + 1)); }
+
+echo
+echo "-- Dashboard: série temporal (real + projetado) --"
+
+status=$(chamar GET "/api/dashboard/series?granularidade=mes")
+verificar "série mensal (200)" 200 "$status"
+granularidade_ok=$(corpo | jq -r '.granularidade == "Mes" and (.pontos | type) == "array"')
+[[ "$granularidade_ok" == "true" ]] \
+  && echo "  OK     estrutura da série mensal (granularidade + pontos[])" \
+  || { echo "  FALHOU estrutura inesperada: $(corpo)"; FALHAS=$((FALHAS + 1)); }
+
+status=$(chamar GET "/api/dashboard/series?granularidade=dia&mesesProjecao=1")
+verificar "série diária (200)" 200 "$status"
+granularidade_ok=$(corpo | jq -r '.granularidade == "Dia" and (.pontos | type) == "array"')
+[[ "$granularidade_ok" == "true" ]] \
+  && echo "  OK     estrutura da série diária (granularidade + pontos[])" \
+  || { echo "  FALHOU estrutura inesperada: $(corpo)"; FALHAS=$((FALHAS + 1)); }
+
+echo
 echo "-- Deleção em cascata --"
 
 status=$(chamar DELETE "/api/pessoas/$ANA_ID")
@@ -116,6 +146,13 @@ qtde=$(corpo | jq -r 'length')
 [[ "$qtde" == "0" ]] \
   && echo "  OK     transações da pessoa deletada foram removidas em cascata" \
   || { echo "  FALHOU ainda existem $qtde transações da pessoa deletada"; FALHAS=$((FALHAS + 1)); }
+
+status=$(chamar GET "/api/fixas?pessoaId=$ANA_ID")
+verificar "listar fixas da pessoa deletada" 200 "$status"
+qtde=$(corpo | jq -r 'length')
+[[ "$qtde" == "0" ]] \
+  && echo "  OK     fixas da pessoa deletada foram removidas em cascata" \
+  || { echo "  FALHOU ainda existem $qtde fixas da pessoa deletada"; FALHAS=$((FALHAS + 1)); }
 
 status=$(chamar DELETE "/api/pessoas/$ANA_ID")
 verificar "deletar pessoa já deletada: 404" 404 "$status"

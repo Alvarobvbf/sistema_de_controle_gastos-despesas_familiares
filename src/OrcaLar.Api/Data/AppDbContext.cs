@@ -16,6 +16,8 @@ public class AppDbContext : DbContext
 
     public DbSet<Transacao> Transacoes => Set<Transacao>();
 
+    public DbSet<Fixa> Fixas => Set<Fixa>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Pessoa>(pessoa =>
@@ -38,11 +40,29 @@ public class AppDbContext : DbContext
             // diretamente em uma consulta SQL (consistente com a serialização JSON).
             transacao.Property(t => t.Tipo).HasConversion<string>();
 
+            transacao.Property(t => t.Data).HasColumnType("date");
+
             // Cascade garantido no nível do banco (FK ON DELETE CASCADE): deletar uma Pessoa
             // apaga suas Transacoes mesmo que a deleção não passe pelo EF (ex.: script SQL direto).
             transacao.HasOne(t => t.Pessoa)
                 .WithMany(p => p.Transacoes)
                 .HasForeignKey(t => t.PessoaId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Fixa>(fixa =>
+        {
+            fixa.HasKey(f => f.Id);
+            fixa.Property(f => f.Descricao).IsRequired();
+            fixa.Property(f => f.Valor).HasColumnType("numeric(18,2)");
+            fixa.Property(f => f.Tipo).HasConversion<string>();
+            fixa.Property(f => f.DataInicio).HasColumnType("date");
+            fixa.Property(f => f.DataFim).HasColumnType("date");
+
+            // Mesma regra de cascade de Transacao: apagar a Pessoa apaga também suas Fixas.
+            fixa.HasOne(f => f.Pessoa)
+                .WithMany(p => p.Fixas)
+                .HasForeignKey(f => f.PessoaId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

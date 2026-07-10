@@ -51,7 +51,7 @@ public class PessoaService
     }
 
     /// <summary>
-    /// Deleta a pessoa e, em cascata, todas as suas transações. As transações precisam estar
+    /// Deleta a pessoa e, em cascata, todas as suas transações e fixas. Ambas precisam estar
     /// carregadas (Include) para que o EF Core aplique o cascade delete também no nível do
     /// change tracker — a constraint ON DELETE CASCADE no banco cobre o caso de deleção direta
     /// via SQL, mas o comportamento em memória (usado nos testes) depende do tracking.
@@ -61,6 +61,7 @@ public class PessoaService
     {
         var pessoa = await _dbContext.Pessoas
             .Include(p => p.Transacoes)
+            .Include(p => p.Fixas)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (pessoa is null)

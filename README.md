@@ -8,10 +8,16 @@ transações (receitas e despesas) e consulta de totais consolidados por pessoa 
 ## Funcionalidades
 
 - **Pessoas** — cadastro, listagem (com busca por nome) e remoção.
-- **Transações** — registro de receitas e despesas associadas a uma pessoa, com listagem
-  e filtros (por pessoa e por tipo).
+- **Transações** — registro de receitas e despesas associadas a uma pessoa, com data
+  (opcional na criação — assume a data do servidor quando omitida), listagem ordenada por
+  data (mais recente primeiro) e filtros (por pessoa e por tipo).
 - **Totais** — consulta consolidada: receitas, despesas e saldo por pessoa, mais o total
   geral da casa.
+- **Fixas** _(extra)_ — cadastro de lançamentos recorrentes (ex.: aluguel, mesada), com
+  dia do mês, vigência (início e, opcionalmente, fim). Não são transações: nunca aparecem
+  em `/api/transacoes` nem em `/api/totais`.
+- **Dashboard** _(extra)_ — `GET /api/dashboard/series`: série temporal combinando o
+  histórico real com a projeção das Fixas, com saldo acumulado contínuo entre os dois.
 
 ## Stack
 
@@ -57,6 +63,29 @@ transações (receitas e despesas) e consulta de totais consolidados por pessoa 
   ainda não estar aceitando conexões no instante em que o container da API inicia; sem
   retry, essa corrida derrubaria o primeiro boot.
 
+## Decisões dos extras (data, fixas e dashboard)
+
+- **Fixa é uma REGRA, não uma transação, e nunca persiste ocorrências**: cadastrar uma
+  Fixa não cria nenhuma linha em `Transacao`. Suas ocorrências são calculadas **sob
+  demanda**, a cada requisição ao dashboard, pelo motor de projeção (`MotorProjecaoFixas`).
+  Não existe scheduler, job em background nem tabela de "ocorrências geradas" — se a regra
+  mudar (valor, dia, vigência), a projeção muda imediatamente na próxima consulta, sem
+  precisar reprocessar nada retroativamente.
+- **`/api/totais` e `/api/transacoes` continuam refletindo só transações reais**: os
+  extras foram construídos ao lado do que já existia, sem alterar esses dois contratos —
+  Fixas e a projeção vivem inteiramente em `/api/fixas` e `/api/dashboard/series`.
+- **Separação Realizado vs. Projetado**: cada ponto da série do dashboard traz um booleano
+  `projetado` (`false` = veio de transações reais; `true` = veio da expansão de Fixas). A
+  intenção é o front renderizar o trecho realizado como linha sólida e o projetado como
+  pontilhada — **essa renderização ainda não existe no front** (fora do escopo desta
+  rodada, que tocou só back-end/Docker/documentação); o contrato já está pronto para isso.
+- **Toggle mês/dia**: é o parâmetro `granularidade` do próprio endpoint
+  (`mes` agrupa contínuo por mês; `dia` só emite dias com evento, para não gerar ~365
+  buckets vazios) — a UI de toggle no front também fica para uma rodada futura.
+- **Data como fonte única do servidor**: igual à Fixa (`DataInicio` default), o campo
+  `Data` de Transacao usa `DateOnly.FromDateTime(DateTime.UtcNow)` quando omitido — nunca
+  se confia no relógio do cliente.
+
 ## Regras de negócio
 
 - **Pessoa**: criação, listagem (busca parcial por nome, case-insensitive) e remoção. Ao
@@ -70,6 +99,16 @@ transações (receitas e despesas) e consulta de totais consolidados por pessoa 
 - **Totais**: para cada pessoa, soma de receitas, soma de despesas e saldo (receitas −
   despesas). Pessoas sem nenhuma transação aparecem com 0/0/0 (não somem da lista). O
   total geral soma todas as pessoas.
+- **Fixa**: mesmas duas regras de Transação (pessoa precisa existir → 422
+  `PESSOA_NAO_ENCONTRADA`; menor de 18 anos não pode ter receita fixa → 422
+  `REGRA_MENOR_RECEITA`), mais validação de formato (400): valor > 0, `diaDoMes` entre 1
+  e 31, e `dataFim ≥ dataInicio` quando ambas informadas. Dias que não existem no mês
+  (ex.: 31 em fevereiro) sofrem clamp para o último dia real do mês na hora de projetar.
+  Apenas criação, listagem (filtro opcional por pessoa) e remoção — sem edição.
+- **Dashboard**: `granularidade` (`mes` padrão ou `dia`) e `mesesProjecao` (padrão 6,
+  quantos meses projetar a partir de hoje). Histórico = só transações reais, do primeiro
+  registro até hoje. Projeção = ocorrências de Fixas, de hoje até hoje + `mesesProjecao`,
+  com o saldo acumulado continuando exatamente de onde o real parou.
 
 ## Estrutura de pastas
 
@@ -84,9 +123,11 @@ orcalar/
 
   src/OrcaLar.Api/
     Controllers/           endpoints HTTP (só orquestram)
-    Services/               regras de negócio (Pessoa, Transacao, Totais)
+    Services/               regras de negócio (Pessoa, Transacao, Fixa, Totais, Dashboard)
+                             + motores puros (MotorProjecaoFixas, MotorSeries) e o helper
+                             de regras compartilhadas (RegrasLancamento)
     Data/                   AppDbContext, configuração Fluent e migrations
-    Domain/Entities/        entidades de domínio (Pessoa, Transacao, TipoTransacao)
+    Domain/Entities/        entidades de domínio (Pessoa, Transacao, Fixa, TipoTransacao)
     Dtos/                   contratos de request/response
     Infrastructure/         parser de DATABASE_URL, retry de migration, erro/exceção
     Program.cs               pipeline: erro → static files → controllers → SPA fallback
@@ -110,9 +151,13 @@ orcalar/
 | POST   | `/api/pessoas`                    | Cria uma pessoa                               |
 | GET    | `/api/pessoas?nome=`               | Lista pessoas (filtro opcional por nome)      |
 | DELETE | `/api/pessoas/{id}`                | Remove uma pessoa (e suas transações)         |
-| POST   | `/api/transacoes`                 | Cria uma transação                            |
-| GET    | `/api/transacoes?pessoaId=&tipo=` | Lista transações (filtros opcionais)          |
+| POST   | `/api/transacoes`                 | Cria uma transação (data opcional)            |
+| GET    | `/api/transacoes?pessoaId=&tipo=` | Lista transações (filtros opcionais), por data desc |
 | GET    | `/api/totais`                     | Totais por pessoa + total geral               |
+| POST   | `/api/fixas`                       | Cria uma regra de lançamento recorrente       |
+| GET    | `/api/fixas?pessoaId=`            | Lista fixas (filtro opcional por pessoa)      |
+| DELETE | `/api/fixas/{id}`                  | Remove uma fixa                               |
+| GET    | `/api/dashboard/series?granularidade=&mesesProjecao=` | Série real + projetada |
 
 Erros seguem sempre o mesmo envelope:
 
@@ -191,8 +236,9 @@ Com a API rodando (via `dotnet run` ou dockerizada, na porta que estiver publica
 BASE_URL=http://localhost:8080 ./scripts/smoke-test.sh
 ```
 
-Exercita o caminho feliz e as regras de negócio (menor não pode ter receita, pessoa
-inexistente é rejeitada, cascade na remoção etc.) via HTTP real — complementa os testes
+Exercita o caminho feliz e as regras de negócio (menor não pode ter receita — inclusive
+via Fixa —, pessoa inexistente é rejeitada, cascade na remoção de transações e fixas,
+série do dashboard nas duas granularidades etc.) via HTTP real — complementa os testes
 automatizados, que rodam isolados via InMemory. Requer `curl` e `jq`.
 
 ## Deploy no Railway
