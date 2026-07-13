@@ -1,6 +1,7 @@
 import { useApiData } from '../hooks/useApiData'
 import { obterTotais } from '../api/totais'
 import { Carregando, MensagemErro, MensagemVazia } from '../components/Estado'
+import { Dashboard } from '../components/Dashboard'
 import { formatarMoeda } from '../utils/formatarMoeda'
 
 /** Verde para saldo positivo/zero, vermelho para negativo — mesma lógica usada nas duas linhas. */
@@ -67,6 +68,10 @@ export function TotaisPage() {
           </table>
         </div>
       )}
+
+      {/* Consulta de totais (acima) reflete só transações reais e não muda em nada aqui —
+          o dashboard é aditivo, combina esse realizado com a projeção das fixas. */}
+      <Dashboard />
     </div>
   )
 }

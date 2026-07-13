@@ -28,6 +28,12 @@ export function Layout() {
               Transações
             </NavLink>
             <NavLink
+              to="/fixas"
+              className={({ isActive }) => `${linkBase} ${isActive ? linkAtivo : ''}`}
+            >
+              Fixas
+            </NavLink>
+            <NavLink
               to="/totais"
               className={({ isActive }) => `${linkBase} ${isActive ? linkAtivo : ''}`}
             >
