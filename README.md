@@ -1,7 +1,9 @@
 # OrçaLar
 
 Sistema de controle de gastos residenciais: cadastro de pessoas, registro de suas
-transações (receitas e despesas) e consulta de totais consolidados por pessoa e geral.
+transações (receitas e despesas) e consulta de totais consolidados por pessoa e geral —
+com lançamentos recorrentes (Fixas) e um dashboard que projeta o saldo futuro com base
+neles.
 
 **Deploy (Railway):** https://sistemadecontrolegastos-despesasfamiliares-production.up.railway.app
 
@@ -13,16 +15,19 @@ transações (receitas e despesas) e consulta de totais consolidados por pessoa 
   data (mais recente primeiro) e filtros (por pessoa e por tipo).
 - **Totais** — consulta consolidada: receitas, despesas e saldo por pessoa, mais o total
   geral da casa.
-- **Fixas** _(extra)_ — cadastro de lançamentos recorrentes (ex.: aluguel, mesada), com
-  dia do mês, vigência (início e, opcionalmente, fim). Não são transações: nunca aparecem
-  em `/api/transacoes` nem em `/api/totais`.
-- **Dashboard** _(extra)_ — `GET /api/dashboard/series`: série temporal combinando o
-  histórico real com a projeção das Fixas, com saldo acumulado contínuo entre os dois.
+- **Fixas** _(extra)_ — tela própria (`/fixas`) para cadastro de lançamentos recorrentes
+  (ex.: aluguel, mesada), com dia do mês, vigência (início e, opcionalmente, fim). Não são
+  transações: nunca aparecem em `/api/transacoes` nem em `/api/totais`, nem na listagem de
+  Transações.
+- **Dashboard** _(extra)_ — na página de Totais, abaixo da tabela oficial: série temporal
+  (Recharts) combinando o histórico real com a projeção das Fixas — gráfico de saldo
+  acumulado (sólido = realizado, pontilhado = projeção) e gráfico de receitas × despesas
+  por período, com toggle mês/dia e horizonte de projeção configurável (3/6/12 meses).
 
 ## Stack
 
 - **Back-end**: .NET 10 (ASP.NET Core Web API) + Entity Framework Core / Npgsql + PostgreSQL.
-- **Front-end**: Vite + React + TypeScript + Tailwind CSS v4 + react-router (`web/`).
+- **Front-end**: Vite + React + TypeScript + Tailwind CSS v4 + react-router + Recharts (`web/`).
 - **Testes**: xUnit + EF Core InMemory (`tests/`).
 - **Empacotamento**: uma única imagem Docker (o back-end serve a SPA buildada).
 
@@ -75,13 +80,14 @@ transações (receitas e despesas) e consulta de totais consolidados por pessoa 
   extras foram construídos ao lado do que já existia, sem alterar esses dois contratos —
   Fixas e a projeção vivem inteiramente em `/api/fixas` e `/api/dashboard/series`.
 - **Separação Realizado vs. Projetado**: cada ponto da série do dashboard traz um booleano
-  `projetado` (`false` = veio de transações reais; `true` = veio da expansão de Fixas). A
-  intenção é o front renderizar o trecho realizado como linha sólida e o projetado como
-  pontilhada — **essa renderização ainda não existe no front** (fora do escopo desta
-  rodada, que tocou só back-end/Docker/documentação); o contrato já está pronto para isso.
-- **Toggle mês/dia**: é o parâmetro `granularidade` do próprio endpoint
-  (`mes` agrupa contínuo por mês; `dia` só emite dias com evento, para não gerar ~365
-  buckets vazios) — a UI de toggle no front também fica para uma rodada futura.
+  `projetado` (`false` = veio de transações reais; `true` = veio da expansão de Fixas). O
+  front usa isso para renderizar duas séries sobre o mesmo `LineChart` (uma só preenchida
+  nos pontos reais, outra só nos projetados, cada uma `null` no resto) — o último ponto
+  real também recebe o valor na série projetada, criando o vértice que conecta visualmente
+  o traço sólido (realizado) ao pontilhado (projeção) exatamente em "hoje".
+- **Toggle mês/dia**: é o parâmetro `granularidade` do próprio endpoint (`mes` agrupa
+  contínuo por mês; `dia` só emite dias com evento, para não gerar ~365 buckets vazios) —
+  no front, isso é literalmente o estado que dispara um novo fetch, sem lógica adicional.
 - **Data como fonte única do servidor**: igual à Fixa (`DataInicio` default), o campo
   `Data` de Transacao usa `DateOnly.FromDateTime(DateTime.UtcNow)` quando omitido — nunca
   se confia no relógio do cliente.
@@ -137,11 +143,14 @@ orcalar/
 
   web/src/
     api/                     client HTTP central (envelope de erro) + uma função por endpoint
+                             (pessoas, transacoes, fixas, dashboard)
     types/                   tipos TS espelhando os DTOs reais do back
     hooks/                   useApiData (loading/erro) e useDebounce (busca por nome)
-    components/              Layout (nav), estados de loading/erro/vazio, badge de tipo
-    pages/                   as 3 telas: Pessoas, Transações, Totais
-    router.tsx               as 3 rotas + redirect da raiz
+    utils/                   formatarMoeda (R$) e formatarData/formatarPeriodo (datas)
+    components/              Layout (nav), estados de loading/erro/vazio, badge de tipo,
+                             Dashboard (gráficos Recharts da página de Totais)
+    pages/                   as 4 telas: Pessoas, Transações, Fixas, Totais (com dashboard)
+    router.tsx               as 4 rotas + redirect da raiz
 ```
 
 ## Contrato da API (base `/api`)
@@ -261,8 +270,13 @@ Depois do deploy, cole a URL pública no topo deste README.
 
 ## Notas de UX (front-end)
 
-- A regra "menor de 18 anos só pode ter despesa" é refletida no formulário de criação de
-  transação (a opção "Receita" fica desabilitada) — isso é só prevenção de UX; quem decide
-  de fato é o back-end, que responde 422 (`REGRA_MENOR_RECEITA`) se essa checagem for burlada.
+- A regra "menor de 18 anos só pode ter despesa" é refletida nos formulários de criação de
+  transação **e** de fixa (a opção "Receita" fica desabilitada) — isso é só prevenção de
+  UX; quem decide de fato é o back-end, que responde 422 (`REGRA_MENOR_RECEITA`) se essa
+  checagem for burlada.
 - Toda resposta de erro do back (400/422) é lida do envelope `{ error: { code, message } }`
   e a `message` é exibida diretamente ao usuário.
+- O campo de data (transação e início de fixa) mostra "vazio = hoje": omitir o campo não é
+  um erro, é o caminho normal para "agora".
+- A tela de Fixas deixa explícito, em um subtítulo, que fixa é uma regra de recorrência —
+  não uma transação — para não confundir com a listagem de Transações.
